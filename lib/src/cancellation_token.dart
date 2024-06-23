@@ -17,12 +17,19 @@ class CancellationToken {
   OperationCanceledError? get cancelError => _cancelError;
 
   /// cancel operation
-  void cancel([String? msg]) {
-    _cancelError = OperationCanceledError(msg ?? 'cancel this token');
+  /// throw error is expensive
+  void cancel([String? msg, bool error = false]) {
+    if (error) {
+      _cancelError = OperationCanceledError(msg ?? 'cancel this token');
+    }
     if (_completers.isNotEmpty) {
       _completers
           // ignore: avoid_function_literals_in_foreach_calls
-          .forEach((Completer<dynamic> e) => e.completeError(cancelError!));
+          .forEach(
+        (Completer<dynamic> e) => _cancelError != null
+            ? e.completeError(_cancelError!)
+            : e.complete(),
+      );
     }
   }
 
@@ -53,11 +60,13 @@ class CancellationToken {
 
 class OperationCanceledError extends Error {
   OperationCanceledError(this.msg);
+
   final String msg;
 }
 
 class CancellationTokenSource {
   CancellationTokenSource._();
+
   static Future<T> register<T>(
       CancellationToken? cancelToken, Future<T> future) {
     if (cancelToken != null && !cancelToken.isCanceled) {
